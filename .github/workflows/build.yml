@@ -13,7 +13,7 @@ on:
   pull_request:
   merge_group:
 
-  permissions: {}
+permissions: {}
 
 env:
   CARGO_TERM_COLOR: always
@@ -29,36 +29,37 @@ jobs:
   run_udeps:
     name: Run Cargo Udeps
     runs-on: ubuntu-latest
-    permissions: 
+    permissions:
       contents: read
     env:
-      RUSTC_BOOTSTRAP: 1
+      RUSTC_BOOTSTRAP: "1"
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with: 
+        with:
           persist-credentials: false
-      
+
       - name: Install rust toolchain
-        run: | 
-            rustup toolchain install "${RUST_TOOLCHAIN_VERSION}"
-            rustup default "${RUST_TOOLCHAIN_VERSION}"
-      
+        run: |
+          rustup toolchain install "${RUST_TOOLCHAIN_VERSION}" --profile minimal
+          rustup default "${RUST_TOOLCHAIN_VERSION}"
+
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
         with:
           key: udeps
 
       - name: Install cargo-udeps
-        run: cargo install cargo-udeps --version "${CARGO_UDEPS_VERSION}" --locked
+        run: cargo install cargo-udeps --locked
 
       - name: Check for unused dependencies
         run: cargo udeps --all-targets --all-features
 
-
   run_cargodeny:
     name: Run Cargo Deny
     runs-on: ubuntu-latest
-    permissions: 
+    permissions:
       contents: read
+
     strategy:
       matrix:
         checks:
@@ -72,7 +73,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      
+
       - uses: EmbarkStudios/cargo-deny-action@3fd3802e88374d3fe9159b834c7714ec57d6c979 # v2.0.15
         with:
           command: check ${{ matrix.checks }}
@@ -80,8 +81,9 @@ jobs:
   run_rustfmt:
     name: Run Rustfmt
     runs-on: ubuntu-latest
-    permissions: 
+    permissions:
       contents: read
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -89,30 +91,47 @@ jobs:
 
       - name: Install Rust toolchain with rustfmt
         run: |
-          rustup toolchain install "${RUST_TOOLCHAIN_VERSION}" --profile minimal --component rustfmt
+          rustup toolchain install "${RUST_TOOLCHAIN_VERSION}" \
+            --profile minimal \
+            --component rustfmt
           rustup default "${RUST_TOOLCHAIN_VERSION}"
 
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
         with:
           key: fmt
-      - run: cargo fmt --all -- --check
+
+      - name: Run Rustfmt
+        run: cargo fmt --all -- --check
 
   run_clippy:
     name: Run Clippy
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
     steps:
       - name: Install host dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install protobuf-compiler krb5-user libkrb5-dev libclang-dev liblzma-dev libssl-dev pkg-config
+          sudo apt-get install --yes \
+            protobuf-compiler \
+            krb5-user \
+            libkrb5-dev \
+            libclang-dev \
+            liblzma-dev \
+            libssl-dev \
+            pkg-config
+
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
           persist-credentials: false
 
-            - name: Install Rust toolchain with Clippy
+      - name: Install Rust toolchain with Clippy
         run: |
-          rustup toolchain install "${RUST_TOOLCHAIN_VERSION}" --profile minimal --component clippy
+          rustup toolchain install "${RUST_TOOLCHAIN_VERSION}" \
+            --profile minimal \
+            --component clippy
           rustup default "${RUST_TOOLCHAIN_VERSION}"
 
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
@@ -121,12 +140,12 @@ jobs:
 
       - name: Run Clippy
         run: cargo clippy --color never -q --all-targets -- -D warnings
-
   run_rustdoc:
     name: Run RustDoc
     runs-on: ubuntu-latest
     permissions:
-      contents: read 
+      contents: read
+
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -143,42 +162,49 @@ jobs:
 
       - name: Build documentation
         run: cargo doc --document-private-items
-    run_tests:
-      name: Run Cargo Tests
-      needs:
-        - run_clippy
-        - run_rustfmt
-        - run_rustdoc
-      runs-on: ubuntu-latest
-      permissions:
-        contents: read # Required by actions/checkout.
-      steps:
-        - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-          with:
-            persist-credentials: false
 
-        - name: Install Rust toolchain with rust-src
-          run: |
-            rustup toolchain install "${RUST_TOOLCHAIN_VERSION}" --profile minimal --component rust-src
-            rustup default "${RUST_TOOLCHAIN_VERSION}"
+  run_tests:
+    name: Run Cargo Tests
+    needs:
+      - run_clippy
+      - run_rustfmt
+      - run_rustdoc
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read  # Required by actions/checkout.
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain with rust-src
+        run: |
+          rustup toolchain install "${RUST_TOOLCHAIN_VERSION}" \
+            --profile minimal \
+            --component rust-src
+          rustup default "${RUST_TOOLCHAIN_VERSION}"
 
           # rust-src is required for trybuild stderr output comparison to work
           # for our cases.
           # See: https://github.com/dtolnay/trybuild/issues/236#issuecomment-1620950759
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          key: test
 
-        - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
-          with:
-            key: test
-
-        - name: Run tests
-          run: cargo test --all-feature
+      - name: Run tests
+        run: cargo test --all-features
 
   tests_passed:
     name: All tests passed
     needs:
       - run_udeps
+      - run_cargodeny
       - run_tests
     runs-on: ubuntu-latest
+    permissions: {}
+
     steps:
       - name: log
         run: echo All tests have passed!
+        
